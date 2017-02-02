@@ -144,7 +144,7 @@ namespace TB
 		#endif
 		private long strstrNoEscaped(long idx, byte b0){
 			// look forward for the matching character, not counting escaped versions of it
-			long bytesLengthMinusSearchSize = bytesLength - 1;
+			long bytesLengthMinusSearchSize = bytesLength;
 			byte[] localBytes = bytes;
 
 			while (idx < bytesLengthMinusSearchSize) {
@@ -165,7 +165,7 @@ namespace TB
 		[Il2CppSetOption(Option.DivideByZeroChecks, false)]
 		#endif
 		private long strskip(long idx,params byte[] byteList){
-			long bytesLengthMinusSearchSize = bytesLength - 1;
+			long bytesLengthMinusSearchSize = bytesLength;
 			byte[] localBytes = bytes;
 			byte compareByte;
 
@@ -194,7 +194,7 @@ namespace TB
 		[Il2CppSetOption(Option.DivideByZeroChecks, false)]
 		#endif
 		private long strstr1(long idx, params byte[] byteList){
-			long bytesLengthMinusSearchSize = bytesLength - 1;
+			long bytesLengthMinusSearchSize = bytesLength;
 			byte[] localBytes = bytes;
 			byte compareByte;
 
@@ -283,7 +283,7 @@ namespace TB
 				long nextCurrentIdx = currentIdx+1;
 
 				if (localBytes [currentIdx] == (byte)'}' || localBytes [currentIdx] == (byte)']') {
-					EndElement (elementStack, freeElementList, onEndElement);
+					xmlElement = EndElement (elementStack, freeElementList, onEndElement);
 
 				} else if (localBytes [currentIdx] == (byte)'{' || localBytes [currentIdx] == (byte)'[') {
 					// we've found the start of a new object
@@ -318,7 +318,7 @@ namespace TB
 
 					onStartElement (xmlElement, parentElement, parentIdx);
 									
-				} else if (localBytes [currentIdx] == (byte)'\"' || localBytes [currentIdx] == (byte)'\'') {
+				} else if (xmlElement.type == ElementType.Object && localBytes [currentIdx] == (byte)'\"' || localBytes [currentIdx] == (byte)'\'') {
 
 					// We've found the name portiong of a KVP
 					if (xmlAttribute.nameIdx == 0) {
@@ -376,7 +376,7 @@ namespace TB
 
 							if(localBytes [nextCurrentIdx] == (byte)']') {
 								localBytes [nextCurrentIdx] = 0;
-								EndElement (elementStack, freeElementList, onEndElement);
+								xmlElement = EndElement (elementStack, freeElementList, onEndElement);
 							}
 							localBytes [nextCurrentIdx] = 0;
 							nextCurrentIdx++;
@@ -439,7 +439,7 @@ namespace TB
 
 							if(localBytes [nextCurrentIdx] == (byte)']') {
 								localBytes [nextCurrentIdx] = 0;
-								EndElement (elementStack, freeElementList, onEndElement);
+								xmlElement = EndElement (elementStack, freeElementList, onEndElement);
 							}
 							localBytes [nextCurrentIdx] = 0;
 							nextCurrentIdx++;
@@ -452,11 +452,11 @@ namespace TB
 			}
 
 			while (elementStack.Count > 0) {
-				EndElement (elementStack, freeElementList, onEndElement);
+				xmlElement = EndElement (elementStack, freeElementList, onEndElement);
 			}
 		}
 
-		private void EndElement(Stack<TBJSONElement> elementStack, Stack<TBJSONElement> freeElementList, Action<TBJSONElement,TBJSONElement,int> onEndElement) {
+		private TBJSONElement EndElement(Stack<TBJSONElement> elementStack, Stack<TBJSONElement> freeElementList, Action<TBJSONElement,TBJSONElement,int> onEndElement) {
 			if (elementStack.Count > 0) {
 				TBJSONElement myElement = elementStack.Pop ();
 				TBJSONElement parentElement = null;
@@ -468,7 +468,9 @@ namespace TB
 				onEndElement (myElement, parentElement, parentIdx);
 				myElement.values.Clear ();
 				freeElementList.Push (myElement);
+				return parentElement;
 			}
+			return null;
 		}
 
 		#endregion
