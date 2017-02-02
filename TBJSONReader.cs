@@ -276,18 +276,14 @@ namespace TB
 			TBJSONElement xmlElement = null;
 
 			// find next element start
-			while ((currentIdx = strskip(currentIdx, (byte)' ', (byte)'\t', (byte)'\n', (byte)'\r')) < localBytesLength) {
+			while ((currentIdx = strskip(currentIdx, (byte)' ', (byte)'\t', (byte)'\n', (byte)'\r', (byte)',')) < localBytesLength) {
 
 				// ok, so the main algorithm is fairly simple. At this point, we've identified the start of an object enclosure, an array enclosure, or the start of a string
 				// make an element for this and put it on the stack
 				long nextCurrentIdx = currentIdx+1;
 
 				if (localBytes [currentIdx] == (byte)'}' || localBytes [currentIdx] == (byte)']') {
-					// ending of an element
-					TBJSONElement closeElement = elementStack.Pop ();
-					onEndElement (closeElement, elementStack.Peek(), elementStack.Peek().values.Count-1);
-					closeElement.values.Clear ();
-					freeElementList.Push (closeElement);
+					EndElement (elementStack, freeElementList, onEndElement);
 
 				} else if (localBytes [currentIdx] == (byte)'{' || localBytes [currentIdx] == (byte)'[') {
 					// we've found the start of a new object
@@ -353,7 +349,7 @@ namespace TB
 
 						} else if (localBytes [nextCurrentIdx] == (byte)'{' || localBytes [nextCurrentIdx] == (byte)'[') {
 							// our value is an array or an object; we will process it next time through the main loop
-							nextCurrentIdx = nextCurrentIdx - 1;
+							//nextCurrentIdx = nextCurrentIdx - 1;
 
 						} else if (localBytes [nextCurrentIdx] == (byte)'n' && localBytes [nextCurrentIdx + 1] == (byte)'u' && localBytes [nextCurrentIdx + 2] == (byte)'l' && localBytes [nextCurrentIdx + 3] == (byte)'l') {
 							// our value is null; pick up at the end of it
@@ -374,11 +370,18 @@ namespace TB
 								nextCurrentIdx++;
 							}
 
+							xmlElement.values.Add (xmlAttribute);
+							xmlAttribute.Clear ();
+
+
+							if(localBytes [nextCurrentIdx] == (byte)']') {
+								localBytes [nextCurrentIdx] = 0;
+								EndElement (elementStack, freeElementList, onEndElement);
+							}
 							localBytes [nextCurrentIdx] = 0;
 							nextCurrentIdx++;
 
-							xmlElement.values.Add (xmlAttribute);
-							xmlAttribute.Clear ();
+
 						}
 					} else {
 						// We found the value portion of a KVP
@@ -410,7 +413,7 @@ namespace TB
 
 						} else if (localBytes [nextCurrentIdx] == (byte)'{' || localBytes [nextCurrentIdx] == (byte)'[') {
 							// our value is an array or an object; we will process it next time through the main loop
-							nextCurrentIdx = nextCurrentIdx - 1;
+							//nextCurrentIdx = nextCurrentIdx - 1;
 
 						} else if (localBytes [nextCurrentIdx] == (byte)'n' && localBytes [nextCurrentIdx + 1] == (byte)'u' && localBytes [nextCurrentIdx + 2] == (byte)'l' && localBytes [nextCurrentIdx + 3] == (byte)'l') {
 							// our value is null; pick up at the end of it
@@ -431,11 +434,16 @@ namespace TB
 								nextCurrentIdx++;
 							}
 
+							xmlElement.values.Add (xmlAttribute);
+							xmlAttribute.Clear ();
+
+							if(localBytes [nextCurrentIdx] == (byte)']') {
+								localBytes [nextCurrentIdx] = 0;
+								EndElement (elementStack, freeElementList, onEndElement);
+							}
 							localBytes [nextCurrentIdx] = 0;
 							nextCurrentIdx++;
 
-							xmlElement.values.Add (xmlAttribute);
-							xmlAttribute.Clear ();
 						}
 					}
 				}
@@ -444,14 +452,22 @@ namespace TB
 			}
 
 			while (elementStack.Count > 0) {
+				EndElement (elementStack, freeElementList, onEndElement);
+			}
+		}
+
+		private void EndElement(Stack<TBJSONElement> elementStack, Stack<TBJSONElement> freeElementList, Action<TBJSONElement,TBJSONElement,int> onEndElement) {
+			if (elementStack.Count > 0) {
 				TBJSONElement myElement = elementStack.Pop ();
 				TBJSONElement parentElement = null;
 				int parentIdx = -1;
 				if (elementStack.Count > 0) {
 					parentElement = elementStack.Peek ();
-					parentIdx = parentElement.values.Count-1;
+					parentIdx = parentElement.values.Count - 1;
 				}
 				onEndElement (myElement, parentElement, parentIdx);
+				myElement.values.Clear ();
+				freeElementList.Push (myElement);
 			}
 		}
 
